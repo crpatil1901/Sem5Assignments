@@ -4,21 +4,40 @@ import java.util.*;;
 
 public class Main {
     public static void main(String[] args) {
-        List<Job> jobs = new ArrayList<Job>();
-        for (int i = 0; i < 4; i++) {
-            jobs.add(Utilities.userInput());
-        }
-        FirstComeFirstServe scheduler = new FirstComeFirstServe(jobs);
-        scheduler.processJobs();
+        // Create a list of hardcoded jobs
+        List<Job> jobs = new ArrayList<>();
+        jobs.add(new Job("Job1", 0, 10, 3));
+        jobs.add(new Job("Job2", 1, 5, 2));
+        jobs.add(new Job("Job3", 2, 8, 1));
+        jobs.add(new Job("Job4", 3, 3, 4));
+
+        System.out.println("First-Come-First-Serve (FCFS):");
+        FirstComeFirstServe fcfsScheduler = new FirstComeFirstServe(new ArrayList<>(jobs));
+        fcfsScheduler.processJobs();
+
+        System.out.println("\nShortest Job First (SJF):");
+        ShortestJobFirst sjfScheduler = new ShortestJobFirst(new ArrayList<>(jobs));
+        sjfScheduler.processJobs();
+
+        System.out.println("\nNon-preemptive Priority Scheduling:");
+        Priority priorityScheduler = new Priority(new ArrayList<>(jobs));
+        priorityScheduler.processJobs();
+
+        int timeQuantum = 3;
+        System.out.println("\nPreemptive Round-Robin Scheduling with time quantum " + timeQuantum + ":");
+        RoundRobin rrScheduler = new RoundRobin(new ArrayList<>(jobs), timeQuantum);
+        rrScheduler.processJobs();
     }
 }
+
+
 
 class FirstComeFirstServe {
     List<Job> jobs;
 
     FirstComeFirstServe(List<Job> jobs) {
         this.jobs = jobs;
-        Collections.sort(jobs, new ArrivalComparator());
+        Collections.sort(jobs, new ArrivalTimeComparator());
     }
 
     void processJobs() {
@@ -47,7 +66,128 @@ class FirstComeFirstServe {
 
 class ShortestJobFirst {
     List<Job> jobs;
+
+    ShortestJobFirst(List<Job> jobs) {
+        this.jobs = jobs;
+        Collections.sort(jobs, new ArrivalTimeComparator());
+    }
+
+    void processJobs() {
+        LinkedList<Job> queue = new LinkedList<>();
+        int currentTime = 0;
+        Job currentJob = null;
+        List<Job> completedJobs = new ArrayList<>();
+
+        while (!jobs.isEmpty() || !queue.isEmpty()) {
+            while (!jobs.isEmpty() && jobs.get(0).arrivalTime <= currentTime) {
+                queue.add(jobs.remove(0));
+            }
+
+            if (!queue.isEmpty()) {
+                Collections.sort(queue, new BurstTimeComparator());
+
+                currentJob = queue.removeFirst();
+
+                if (currentJob.busTime > 0) {
+                    currentJob.busTime--;
+                    currentTime++;
+
+                    if (currentJob.busTime > 0) {
+                        queue.addFirst(currentJob);
+                    } else {
+                        currentJob.endTime = currentTime;
+                        completedJobs.add(currentJob);
+                    }
+                } else {
+                    currentJob.endTime = currentTime;
+                    completedJobs.add(currentJob);
+                }
+            } else {
+                currentTime++;
+            }
+        }
+
+        Utilities.show(completedJobs);
+    }
 }
+
+class Priority {
+    List<Job> jobs;
+
+    Priority(List<Job> jobs) {
+        this.jobs = jobs;
+        Collections.sort(jobs, new PriorityComparator());
+    }
+
+    void processJobs() {
+        LinkedList<Job> queue = new LinkedList<>();
+        int currentTime = 0;
+        Job currentJob = null;
+        List<Job> completedJobs = new ArrayList<>();
+
+        while (!jobs.isEmpty() || !queue.isEmpty()) {
+            while (!jobs.isEmpty() && jobs.get(0).arrivalTime <= currentTime) {
+                queue.add(jobs.remove(0));
+            }
+
+            if (!queue.isEmpty()) {
+                currentJob = queue.removeFirst();
+                currentJob.startTime = currentTime;
+                currentTime += currentJob.busTime;
+                currentJob.endTime = currentTime;
+                completedJobs.add(currentJob);
+            } else {
+                currentTime++;
+            }
+        }
+
+        Utilities.show(completedJobs);
+    }
+}
+
+class RoundRobin {
+    List<Job> jobs;
+    int timeQuantum;
+
+    RoundRobin(List<Job> jobs, int timeQuantum) {
+        this.jobs = jobs;
+        this.timeQuantum = timeQuantum;
+        Collections.sort(jobs, new ArrivalTimeComparator());
+    }
+
+    void processJobs() {
+        LinkedList<Job> queue = new LinkedList<>();
+        int currentTime = 0;
+        Job currentJob = null;
+        List<Job> completedJobs = new ArrayList<>();
+
+        while (!jobs.isEmpty() || !queue.isEmpty()) {
+            while (!jobs.isEmpty() && jobs.get(0).arrivalTime <= currentTime) {
+                queue.add(jobs.remove(0));
+            }
+
+            if (!queue.isEmpty()) {
+                currentJob = queue.removeFirst();
+
+                int remainingTime = currentJob.busTime;
+                if (remainingTime > timeQuantum) {
+                    currentJob.busTime -= timeQuantum;
+                    currentTime += timeQuantum;
+                    queue.addFirst(currentJob);
+                } else {
+                    currentTime += remainingTime;
+                    currentJob.endTime = currentTime;
+                    completedJobs.add(currentJob);
+                }
+            } else {
+                currentTime++;
+            }
+        }
+
+        Utilities.show(completedJobs);
+    }
+}
+
 
 class Utilities {
     static Scanner sc = new Scanner(System.in);
@@ -102,7 +242,7 @@ class Job implements Comparable<Job> {
     }
 }
 
-class ArrivalComparator implements Comparator<Job> {
+class ArrivalTimeComparator implements Comparator<Job> {
 
     @Override
     public int compare(Job a, Job b) {
@@ -111,3 +251,16 @@ class ArrivalComparator implements Comparator<Job> {
     
 }
 
+class BurstTimeComparator implements Comparator<Job> {
+    @Override
+    public int compare(Job a, Job b) {
+        return a.busTime - b.busTime;
+    }
+}
+
+class PriorityComparator implements Comparator<Job> {
+    @Override
+    public int compare(Job a, Job b) {
+        return a.priority - b.priority;
+    }
+}
