@@ -61,7 +61,7 @@ symbolTable = dict()
 literalTable = dict()
 poolTable = dict()
 
-def getIntermediateCode(input: str):
+def getIntermediateCodePass1(input):
 
     global mnemonicTable
     global registers
@@ -76,6 +76,7 @@ def getIntermediateCode(input: str):
     intermediateCode = []
 
     def parseOperand(operand):
+        
         if operand in registers:
             return registers[operand]
         elif operand in conditionTable:
@@ -92,7 +93,10 @@ def getIntermediateCode(input: str):
                     break
             else:
                 sIndex = len(symbolTable) + 1
-            symbolTable[sIndex] = [operand, None]
+            # print(symbolTable[sIndex])
+            # if not symbolTable[sIndex]:
+            if not (sIndex in symbolTable and symbolTable[sIndex][1] != None):
+                symbolTable[sIndex] = [operand, None]
             # print(symbolTable)
             return ('S', sIndex)
 
@@ -101,25 +105,46 @@ def getIntermediateCode(input: str):
             currentLine = []
 
             label = None if instruction[0] in mnemonicTable else instruction[0]
-
-            if label != None:
-                sIndex = len(symbolTable) + 1
-                symbolTable[sIndex] = [label, lc]
             
             assemblyOperand = instruction[0] if label == None else instruction[1]
-            operand1 = None if len(instruction) < (3 if label else 2) else parseOperand(instruction[(2 if label else 1)])
-            operand2 = None if len(instruction) < (4 if label else 3) else parseOperand(instruction[(3 if label else 2)])
-
             correspondingOpcode = mnemonicTable[assemblyOperand]
+            
+            operand1 = None
+            operand1 = None
+            
+            if correspondingOpcode[0] != "DL":
+                operand1 = None if len(instruction) < (3 if label else 2) else parseOperand(instruction[(2 if label else 1)])
+                operand2 = None if len(instruction) < (4 if label else 3) else parseOperand(instruction[(3 if label else 2)])
+            else:
+                operand1 = None if len(instruction) < (3 if label else 2) else (instruction[(2 if label else 1)])
+                operand2 = None if len(instruction) < (4 if label else 3) else (instruction[(3 if label else 2)])
+            
+            if label and correspondingOpcode[0] != 'DL':
+                sIndex = len(symbolTable) + 1
+                symbolTable[sIndex] = [label, lc]
 
-            print(correspondingOpcode, operand1, operand2)
             currentLine.append(lc)
             if correspondingOpcode[0] == 'AD':
                 if correspondingOpcode[1] == 1:
-                    lc = operand1[1]
-                    lc -= 1
+                    if operand1:
+                        lc = operand1[1]
+                        lc -= 1
+                    else:
+                        raise Exception("Invalid Operands")
                 else:
                     pass
+            if correspondingOpcode[0] == 'DL':
+                if correspondingOpcode[1] == 1:
+                    for key in symbolTable:
+                        if symbolTable[key][0] == label:
+                            symbolTable[key][1] = lc
+                            break
+                if correspondingOpcode[1] == 2:
+                    for key in symbolTable:
+                        if symbolTable[key][0] == label:
+                            symbolTable[key][1] = lc
+                            break
+                    lc += int(operand1) - 1
             currentLine.append(correspondingOpcode)
             if operand1:
                 currentLine.append(operand1)
@@ -127,13 +152,22 @@ def getIntermediateCode(input: str):
                 currentLine.append(operand2)
             intermediateCode.append(currentLine)
             lc += 1
-        # except:
-        #     print("ERROR:", instruction)
-        #     print()
-    
-    print(*symbolTable)
-    print(*poolTable)
-    print()
     print(*intermediateCode, sep="\n")
-                
-getIntermediateCode(input)
+    print()
+    for key in symbolTable:
+        print(key, symbolTable[key])
+    return intermediateCode
+
+def getIntermediateCodePass2(pass1):
+    global symbolTable
+    op = []
+    for instruction in pass1:
+        line = []
+        line.append(instruction[0])
+        for i in range(1, len(instruction)):
+            line.append(instruction[i][-1])
+        op.append(line)
+    return op
+
+print()
+print(*getIntermediateCodePass2(getIntermediateCodePass1(input)), sep="\n")
