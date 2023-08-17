@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from random import randint
 
 EVEN, ODD = False, True
@@ -99,7 +101,6 @@ if __name__ == "__main__":
         encodedString[char][flippedBit] = not encodedString[char][flippedBit]
     print("\nRecieved Hamming: ")
     print(*list(map(lambda x: stringOf(x), encodedString)), sep="\n")
-        # encodedString[char][flippedBit] = not encodedString[char][flippedBit]
 
     recieved = list(map(lambda x: decodeHamming(x), encodedString))
     print("\nRecieved Message: ")
