@@ -12,6 +12,11 @@ class Assembler {
             this.type = type;
             this.code = code;
         }
+
+        @Override
+        public String toString() {
+            return "(" + type + " " + code + ")";
+        }
     }
 
     class Operand {
@@ -21,6 +26,11 @@ class Assembler {
         Operand(String type, String value) {
             this.type = type;
             this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return "(" + type + " " + value + ")";
         }
     }
 
@@ -58,13 +68,15 @@ class Assembler {
 
     int locationCounter;
 
-    static HashMap<String, Opcode> mnemonicTable;
-    List<PoolTableEntry> poolTable;
-    List<LiteralTableEntry> literalTable;
-    List<SymbolTableEntry> symbolTable;
+    static HashMap<String, Opcode> mnemonicTable = new HashMap<>();
+    static HashMap<String, Integer> registerTable = new HashMap<>();
+    static HashMap<String, Integer> relationalOperatorTable = new HashMap<>();
+    List<PoolTableEntry> poolTable = new ArrayList<>();
+    List<LiteralTableEntry> literalTable = new ArrayList<>();
+    List<SymbolTableEntry> symbolTable = new ArrayList<>();
     List<String> input;
 
-    List<String> intermediateCode;
+    List<String> intermediateCode = new ArrayList<>();
 
     private void initialize() {
         mnemonicTable.put("STOP", new Opcode("IS", 0));
@@ -86,8 +98,20 @@ class Assembler {
         mnemonicTable.put("DC", new Opcode("DL", 1));
         mnemonicTable.put("DS", new Opcode("DL", 2));
 
+        registerTable.put("AREG", 1);
+        registerTable.put("BREG", 2);
+        registerTable.put("CREG", 3);
+        registerTable.put("DREG", 4);
+
+        relationalOperatorTable.put("LT", 1);
+        relationalOperatorTable.put("LE", 2);
+        relationalOperatorTable.put("EQ", 3);
+        relationalOperatorTable.put("GT", 4);
+        relationalOperatorTable.put("GE", 5);
+        relationalOperatorTable.put("ANY", 6);
+
         locationCounter = 0;
-        poolTable.add(new PoolTableEntry(1, 0));
+        poolTable.add(new PoolTableEntry(0, 0));
 
     }
 
@@ -101,60 +125,151 @@ class Assembler {
             String[] tokens = line.split(" ");
             String label, mnemonic, operand1Str, operand2Str;
             label = mnemonic = operand1Str = operand2Str = "";
+
             if (mnemonicTable.containsKey(tokens[0])) {
                 mnemonic = tokens[0];
                 if (tokens.length > 1) {
-                    operand1 = tokens[1];
+                    operand1Str = tokens[1];
                 }
                 if (tokens.length > 2) {
-                    operand2 = tokens[2];
+                    operand2Str = tokens[2];
                 }
             } else {
                 label = tokens[0];
                 mnemonic = tokens[1];
                 if (tokens.length > 2) {
-                    operand1 = tokens[2];
+                    operand1Str = tokens[2];
                 }
                 if (tokens.length > 3) {
-                    operand2 = tokens[3];
+                    operand2Str = tokens[3];
                 }
+            }
+
+            Opcode opcode = mnemonicTable.get(mnemonic);
+            if (opcode == null) {
+                System.out.println("Error: Invalid mnemonic" + mnemonic);
+                continue;
             }
             if (label != "") {
-                symbolTable.add(new SymbolTableEntry(label, locationCounter));
-            }
-            Opcode opcode = mnemonicTable.get(mnemonic);
-            Operand operand1 = new Operand("", "");
-            Operand operand2 = new Operand("", "");
-            if (operand1Str != "") {
-                if (operand1Str.charAt(0) == '=') {
-                    literalTable.add(new LiteralTableEntry(operand1Str, -1));
+                if (opcode.type == "DL") {
+                    int index = -1;
+                    for (int i = 0; i < symbolTable.size(); i++) {
+                        if (symbolTable.get(i).symbol.equals(label)) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index == -1) {
+                        symbolTable.add(new SymbolTableEntry(label, locationCounter));
+                    } else {
+                        symbolTable.get(index).address = locationCounter;
+                    }
                 } else {
-                    operand1 = new Operand("S", operand1Str);
+                    symbolTable.add(new SymbolTableEntry(label, locationCounter));
                 }
+            }
+
+            Operand operand1;
+            Operand operand2;
+
+            if (operand1Str != "") {
+                if (registerTable.containsKey(operand1Str)) {
+                    operand1 = new Operand("", Integer.toString(registerTable.get(operand1Str)));
+                } else if (relationalOperatorTable.containsKey(operand1Str)) {
+                    operand1 = new Operand("", Integer.toString(relationalOperatorTable.get(operand1Str)));
+                } else if (operand1Str.charAt(0) == '=') {
+                    operand1Str = operand1Str.substring(1);
+                    literalTable.add(new LiteralTableEntry(operand1Str, locationCounter));
+                    operand1 = new Operand("C", operand1Str);
+                } else {
+                    int index = -1;
+                    for (int i = 0; i < symbolTable.size(); i++) {
+                        if (symbolTable.get(i).symbol.equals(operand1Str)) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index == -1) {
+                        symbolTable.add(new SymbolTableEntry(operand1Str, -1));
+                        index = symbolTable.size() - 1;
+                    }
+                    operand1 = new Operand("S", index + "");
+                }
+            } else {
+                operand1 = null;
             }
             if (operand2Str != "") {
-                if (operand2Str.charAt(0) == '=') {
-                    literalTable.add(new LiteralTableEntry(operand2Str, -1));
+                if (registerTable.containsKey(operand2Str)) {
+                    operand2 = new Operand("R", Integer.toString(registerTable.get(operand2Str)));
+                } else if (relationalOperatorTable.containsKey(operand2Str)) {
+                    operand2 = new Operand("", Integer.toString(relationalOperatorTable.get(operand2Str)));
+                } else if (operand2Str.charAt(0) == '=') {
+                    operand2Str = operand2Str.substring(1);
+                    literalTable.add(new LiteralTableEntry(operand2Str, locationCounter));
+                    operand2 = new Operand("C", operand2Str);
                 } else {
-                    operand2 = new Operand("S", operand2Str);
+                    int index = -1;
+                    for (int i = 0; i < symbolTable.size(); i++) {
+                        if (symbolTable.get(i).symbol.equals(operand2Str)) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index == -1) {
+                        symbolTable.add(new SymbolTableEntry(operand2Str, -1));
+                        index = symbolTable.size() - 1;
+                    }
+                    operand2 = new Operand("S", index + "");
                 }
+            } else {
+                operand2 = null;
             }
             if (opcode.type == "IS") {
                 locationCounter++;
             } else if (opcode.type == "AD") {
-                if (opcode.code == 1) {
-                    locationCounter = Integer.parseInt(operand1Str);
-                } else if (opcode.code == 2) {
-                    // poolTable.add(new PoolTableEntry(poolTable.get(poolTable.size() - 1).index + 1, 0));
-                } else if (opcode.code == 3) {
-                    // locationCounter = symbolTable.get(symbolTable.indexOf(new SymbolTableEntry(operand1, 0))).address;
-                } else if (opcode.code == 4) {
-                    symbolTable.add(new SymbolTableEntry(operand1Str, locationCounter));
-                } else if (opcode.code == 5) {
+                if (opcode.code == 1) { // START
+                    if (operand1 != null) {
+                        locationCounter = Integer.parseInt(operand1.value);
+                    } else {
+                        System.out.println("Error: START must have an operand");
+                    }
+                } else if (opcode.code == 2) { // END
+                    int start = poolTable.get(poolTable.size() - 1).index;
+                    int end = literalTable.size();
+                    poolTable.get(poolTable.size() - 1).length = end - start;
                     for (int i = poolTable.get(poolTable.size() - 1).index; i < literalTable.size(); i++) {
                         literalTable.get(i).address = locationCounter;
                         locationCounter++;
                     }
+                } else if (opcode.code == 3) { // ORIGIN
+                    if (operand1 != null) {
+                        if (operand1.type == "C") {
+                            locationCounter = Integer.parseInt(operand1.value);
+                        } else if (operand1.type == "S") {
+                            locationCounter = symbolTable.get(Integer.parseInt(operand1.value)).address;
+                        }
+                    } else {
+                        System.out.println("Error: ORIGIN must have an operand");
+                    }
+                } else if (opcode.code == 4) { // EQU
+                    if (operand1 != null) {
+                        if (operand1.type == "C") {
+                            literalTable.add(new LiteralTableEntry(operand1.value, locationCounter));
+                        } else if (operand1.type == "S") {
+                            symbolTable.add(new SymbolTableEntry(label, symbolTable.get(Integer.parseInt(operand1.value)).address));
+                        }
+                    } else {
+                        System.out.println("Error: EQU must have an operand");
+                    }
+                } else if (opcode.code == 5) { // LTORG
+                    int start = poolTable.get(poolTable.size() - 1).index;
+                    int end = literalTable.size();
+                    poolTable.get(poolTable.size() - 1).length = end - start;
+                    for (int i = poolTable.get(poolTable.size() - 1).index; i < literalTable.size(); i++) {
+                        literalTable.get(i).address = locationCounter;
+                        locationCounter++;
+                    }
+                    poolTable.add(new PoolTableEntry(literalTable.size(), 0));
                 }
             } else if (opcode.type == "DL") {
                 if (opcode.code == 1) {
@@ -164,7 +279,50 @@ class Assembler {
                 }
             }
             
+            String IC = ( opcode.type != "AD" ? locationCounter : "___") + "\t" + opcode.toString() + "\t" + (operand1 != null ? operand1.toString() : "") + "\t" + (operand2 != null ? operand2.toString() : "");
+            if (opcode.type == "AD") {
+                locationCounter--;
+            }
+            System.out.println(IC);
+        }
+    }
 
+    void passTwo() {
+        for (String line : intermediateCode) {
+            String[] tokens = line.split("\t");
+            String location = tokens[0];
+            String opcode = tokens[1];
+            String operand1 = tokens[2];
+            String operand2 = tokens[3];
+            if (opcode.equals("IS")) {
+                if (operand1.equals("1")) {
+                    System.out.println("01" + operand2);
+                } else if (operand1.equals("2")) {
+                    System.out.println("02" + operand2);
+                } else if (operand1.equals("3")) {
+                    System.out.println("03" + operand2);
+                } else if (operand1.equals("4")) {
+                    System.out.println("04" + operand2);
+                } else if (operand1.equals("5")) {
+                    System.out.println("05" + operand2);
+                } else if (operand1.equals("6")) {
+                    System.out.println("06" + operand2);
+                } else if (operand1.equals("7")) {
+                    System.out.println("07" + operand2);
+                } else if (operand1.equals("8")) {
+                    System.out.println("08" + operand2);
+                } else if (operand1.equals("9")) {
+                    System.out.println("09" + operand2);
+                } else if (operand1.equals("10")) {
+                    System.out.println("10" + operand2);
+                }
+            } else if (opcode.equals("DL")) {
+                if (operand1.equals("1")) {
+                    System.out.println("01" + operand2);
+                } else if (operand1.equals("2")) {
+                    System.out.println("02" + operand2);
+                }
+            }
         }
     }
 }
@@ -172,7 +330,7 @@ class Assembler {
 public class Main {
     public static void main(String[] args) {
         List<String> input = Arrays.asList(
-            "START 101",
+            "START =101",
             "READ N",
             "MOVER BREG ONE",
             "MOVEM BREG TERM",
@@ -186,11 +344,27 @@ public class Main {
             "MOVEM BREG RESULT",
             "PRINT RESULT",
             "STOP",
-            "N DS 1",
-            "RESULT DS 1",
-            "ONE DC '1'",
-            "TERM DS 1",
-            "TWO DC '2'"
+            "N DS =1",
+            "RESULT DS =1",
+            "ONE DC ='1'",
+            "TERM DS =1",
+            "TWO DC ='2'",
+            "END"
         );
+        Assembler assembler = new Assembler(input);
+        assembler.passOne();
+        // show tables
+        System.out.println("Pool Table");
+        for (Assembler.PoolTableEntry entry : assembler.poolTable) {
+            System.out.println(entry.index + " " + entry.length);
+        }
+        System.out.println("Literal Table");
+        for (Assembler.LiteralTableEntry entry : assembler.literalTable) {
+            System.out.println(entry.value + " " + entry.address);
+        }
+        System.out.println("Symbol Table");
+        for (Assembler.SymbolTableEntry entry : assembler.symbolTable) {
+            System.out.println(entry.symbol + " " + entry.address);
+        }
     }
 }
