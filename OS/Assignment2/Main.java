@@ -15,7 +15,7 @@ class Assembler {
 
         @Override
         public String toString() {
-            return "(" + type + " " + code + ")";
+            return type + "," + code;
         }
     }
 
@@ -30,7 +30,7 @@ class Assembler {
 
         @Override
         public String toString() {
-            return "(" + type + " " + value + ")";
+            return type + "," + value;
         }
     }
 
@@ -160,12 +160,12 @@ class Assembler {
                         }
                     }
                     if (index == -1) {
-                        symbolTable.add(new SymbolTableEntry(label, locationCounter));
+                        symbolTable.add(new SymbolTableEntry(label, locationCounter+1));
                     } else {
-                        symbolTable.get(index).address = locationCounter;
+                        symbolTable.get(index).address = locationCounter+1;
                     }
                 } else {
-                    symbolTable.add(new SymbolTableEntry(label, locationCounter));
+                    symbolTable.add(new SymbolTableEntry(label, locationCounter+1));
                 }
             }
 
@@ -193,7 +193,7 @@ class Assembler {
                         symbolTable.add(new SymbolTableEntry(operand1Str, -1));
                         index = symbolTable.size() - 1;
                     }
-                    operand1 = new Operand("S", index + "");
+                    operand1 = new Operand("S", index+1 + "");
                 }
             } else {
                 operand1 = null;
@@ -208,6 +208,17 @@ class Assembler {
                     literalTable.add(new LiteralTableEntry(operand2Str, locationCounter));
                     operand2 = new Operand("C", operand2Str);
                 } else {
+                    String operand2operator = null;
+                    String operand2oprnd = null;
+                    if (operand2Str.contains("+")) {
+                        operand2operator = "+";
+                        operand2oprnd = operand2Str.split("+")[1];
+                        operand2Str = operand2Str.split("+")[0];
+                    } else if (operand2Str.contains("-")) {
+                        operand2operator = "-";
+                        operand2oprnd = operand2Str.split("-")[1];
+                        operand2Str = operand2Str.split("-")[0];
+                    }
                     int index = -1;
                     for (int i = 0; i < symbolTable.size(); i++) {
                         if (symbolTable.get(i).symbol.equals(operand2Str)) {
@@ -219,7 +230,7 @@ class Assembler {
                         symbolTable.add(new SymbolTableEntry(operand2Str, -1));
                         index = symbolTable.size() - 1;
                     }
-                    operand2 = new Operand("S", index + "");
+                    operand2 = new Operand("S", index+1 + "");
                 }
             } else {
                 operand2 = null;
@@ -283,7 +294,7 @@ class Assembler {
             if (opcode.type == "AD") {
                 locationCounter--;
             }
-            System.out.println(IC);
+            intermediateCode.add(IC);
         }
     }
 
@@ -291,38 +302,13 @@ class Assembler {
         for (String line : intermediateCode) {
             String[] tokens = line.split("\t");
             String location = tokens[0];
-            String opcode = tokens[1];
-            String operand1 = tokens[2];
-            String operand2 = tokens[3];
-            if (opcode.equals("IS")) {
-                if (operand1.equals("1")) {
-                    System.out.println("01" + operand2);
-                } else if (operand1.equals("2")) {
-                    System.out.println("02" + operand2);
-                } else if (operand1.equals("3")) {
-                    System.out.println("03" + operand2);
-                } else if (operand1.equals("4")) {
-                    System.out.println("04" + operand2);
-                } else if (operand1.equals("5")) {
-                    System.out.println("05" + operand2);
-                } else if (operand1.equals("6")) {
-                    System.out.println("06" + operand2);
-                } else if (operand1.equals("7")) {
-                    System.out.println("07" + operand2);
-                } else if (operand1.equals("8")) {
-                    System.out.println("08" + operand2);
-                } else if (operand1.equals("9")) {
-                    System.out.println("09" + operand2);
-                } else if (operand1.equals("10")) {
-                    System.out.println("10" + operand2);
-                }
-            } else if (opcode.equals("DL")) {
-                if (operand1.equals("1")) {
-                    System.out.println("01" + operand2);
-                } else if (operand1.equals("2")) {
-                    System.out.println("02" + operand2);
-                }
-            }
+            String opcode = tokens[1].split(",")[1];
+            String operand1 = tokens.length > 2 ? tokens[2].split(",")[1] : "";
+            String operand2 = tokens.length > 3 ? tokens[3].split(",")[1] : "";
+            String machineCode = location + "\t" + opcode + "\t" + operand1 + "\t" + operand2;
+
+            System.out.println(machineCode);
+
         }
     }
 }
@@ -337,7 +323,7 @@ public class Main {
             "AGAIN MULT BREG TERM",
             "MOVER CREG TERM",
             "ADD CREG ONE",
-            "MOVEM CREG RESULT",
+            "MOVEM CREG TERM",
             "COMP CREG N",
             "BC LE AGAIN",
             "DIV BREG TWO",
@@ -346,25 +332,30 @@ public class Main {
             "STOP",
             "N DS =1",
             "RESULT DS =1",
-            "ONE DC ='1'",
+            "ONE DC =1",
             "TERM DS =1",
-            "TWO DC ='2'",
+            "TWO DC =2",
             "END"
         );
         Assembler assembler = new Assembler(input);
         assembler.passOne();
+        assembler.passTwo();
         // show tables
-        System.out.println("Pool Table");
+        System.out.println("\nPool Table");
         for (Assembler.PoolTableEntry entry : assembler.poolTable) {
             System.out.println(entry.index + " " + entry.length);
         }
-        System.out.println("Literal Table");
+        System.out.println("\nLiteral Table");
         for (Assembler.LiteralTableEntry entry : assembler.literalTable) {
             System.out.println(entry.value + " " + entry.address);
         }
-        System.out.println("Symbol Table");
+        System.out.println("\nSymbol Table");
         for (Assembler.SymbolTableEntry entry : assembler.symbolTable) {
             System.out.println(entry.symbol + " " + entry.address);
+        }
+        System.out.println("\nIntermediate Code");
+        for (String line : assembler.intermediateCode) {
+            System.out.println(line);
         }
     }
 }
