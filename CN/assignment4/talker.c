@@ -1,71 +1,65 @@
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
-#include <signal.h>
-#define PORT 8080
+#include <arpa/inet.h>
+#include <time.h>
 
-int server_fd, new_socket, valread;
+#define WINDOW_SIZE 4
+#define PACKET_SIZE 1024
 
-void sigint_handler(int signum) {
-    close(new_socket);
-    shutdown(server_fd, SHUT_RDWR);
-    printf("Shutting down gracefully...\n");
-    exit(1);
-}
+// Packet structure
+struct Packet {
+    int seq_number;
+    char data[PACKET_SIZE];
+};
 
-int main(int argc, char const* argv[]) {
+int main() {
+    int sockfd;
+    struct sockaddr_in server_addr;
+    socklen_t addr_len = sizeof(server_addr);
+    int base = 0;
+    int next_seq_num = 0;
+    int window_size = WINDOW_SIZE;
+    int total_packets = 10; // Total number of packets to send
 
-    signal(SIGINT, sigint_handler);
-
-    struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
-    char buffer[1024] = { 0 };
-    char* hello = "Hello from talker";
-  
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-  
-    if (setsockopt(server_fd, SOL_SOCKET,
-                   SO_REUSEADDR | SO_REUSEPORT, &opt,
-                   sizeof(opt))) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
+    // Create a UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(1);
     }
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    // Initialize server address and port
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(server_fd, (struct sockaddr*)&address,
-             sizeof(address))
-        < 0) {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
-    }
-    if (listen(server_fd, 5) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-    if ((new_socket
-         = accept(server_fd, (struct sockaddr*)&address,
-                  (socklen_t*)&addrlen))
-        < 0) {
-        perror("accept");
-        exit(EXIT_FAILURE);
+    // Sender logic (Go-Back-N)
+    while (base < total_packets) {
+        while (next_seq_num < base + window_size && next_seq_num < total_packets) {
+            struct Packet packet;
+            packet.seq_number = next_seq_num;
+            // Create and send the packet
+            // Fill packet.data with the actual data to send
+            sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&server_addr, addr_len);
+            printf("Sent packet with sequence number: %d\n", next_seq_num);
+            next_seq_num++;
+        }
+
+        // Receive acknowledgments and update the base
+        struct Packet ack;
+        int ack_received = recvfrom(sockfd, &ack, sizeof(ack), 0, NULL, NULL);
+        if (ack_received != -1 && ack.seq_number >= base) {
+            base = ack.seq_number + 1;
+            printf("Received acknowledgment for sequence number: %d\n", ack.seq_number);
+        } else {
+            printf("Acknowledgment error. Resending packets...\n");
+            next_seq_num = base; // Go back to the base
+        }
     }
 
-    while (1) {
-        valread = read(new_socket, buffer, 1024);
-        printf("%s\n", buffer);
-        buffer[0] = 0;
-    }
-  
-    
+    close(sockfd);
     return 0;
 }

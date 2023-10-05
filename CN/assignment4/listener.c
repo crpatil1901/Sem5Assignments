@@ -1,56 +1,62 @@
-
-#include <arpa/inet.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <signal.h>
 #include <stdlib.h>
-#define PORT 8080
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-int client_fd;
+#define WINDOW_SIZE 4
+#define PACKET_SIZE 1024
 
-void sigint_handler(int signum) {
-    close(client_fd);
-    printf("Shutting down gracefully...\n");
-    exit(1);
-}
+// Packet structure
+struct Packet {
+    int seq_number;
+    char data[PACKET_SIZE];
+};
 
-int main(int argc, char const* argv[]) {
-    signal(SIGINT, sigint_handler);
-	int status, valread;
-	struct sockaddr_in serv_addr;
-	char* msg = "Hello from listener";
-	char buffer[1024] = { 0 };
-    size_t bufferSize = 1024;
-	if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("\n Socket creation error \n");
-		return -1;
-	}
+int main() {
+    int sockfd;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    int expected_seq_num = 0;
 
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(PORT);
-
-	if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)
-		<= 0) {
-		printf(
-			"\nInvalid address/ Address not supported \n");
-		return -1;
-	}
-
-	if ((status
-		= connect(client_fd, (struct sockaddr*)&serv_addr,
-				sizeof(serv_addr)))
-		< 0) {
-		printf("\nConnection Failed \n");
-		return -1;
-	}
-
-    while (1) {
-        send(client_fd, msg, strlen(msg), 0);
-        getline(&msg, &bufferSize, stdin);
+    // Create a UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        exit(1);
     }
 
-	close(client_fd);
-	return 0;
+    // Initialize server address and port
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    // Bind the socket to the server address
+    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Binding failed");
+        exit(1);
+    }
+
+    // Receiver logic (Go-Back-N)
+    while (1) {
+        struct Packet packet;
+        int packet_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_len);
+
+        if (packet_received != -1 && packet.seq_number == expected_seq_num) {
+            // Process the received packet and deliver data to the application layer
+            printf("Received packet with sequence number: %d\n", packet.seq_number);
+            
+            // Send acknowledgment for the received packet
+            sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, addr_len);
+
+            expected_seq_num++;
+        } else {
+            // Packet out of order or error, discard and request retransmission
+            printf("Packet out of order or error. Expected: %d, Received: %d\n", expected_seq_num, packet.seq_number);
+        }
+    }
+
+    close(sockfd);
+    return 0;
 }
