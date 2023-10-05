@@ -21,16 +21,14 @@ def encodeHamming(data, mode = MODE):
     while i < m:
         if j in rPositions: j += 1; continue
         bits[j] = data[i]; i += 1; j += 1
-    # print(bits[::-1])
     for i in range(r):
         j, flag, cntr, parity = 2**i - 1, True, 2**i, mode
         while j < m+r:
-            if flag: parity = xor(parity, bits[j]); # print(j+1, end=" ")
+            if flag: parity = xor(parity, bits[j])
             cntr -= 1
             if cntr == 0: flag = not flag; cntr = 2**i
             j += 1
         bits[2**i - 1] = (parity)
-        # print("\n", bits[::-1], sep = "")
     return bits[::-1]
 
 def decodeHamming(data, mode = MODE):

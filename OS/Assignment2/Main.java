@@ -79,6 +79,7 @@ class Assembler {
     List<String> intermediateCode = new ArrayList<>();
 
     private void initialize() {
+        
         mnemonicTable.put("STOP", new Opcode("IS", 0));
         mnemonicTable.put("ADD", new Opcode("IS", 1));
         mnemonicTable.put("SUB", new Opcode("IS", 2));
@@ -340,7 +341,6 @@ public class Main {
         Assembler assembler = new Assembler(input);
         assembler.passOne();
         assembler.passTwo();
-        // show tables
         System.out.println("\nPool Table");
         for (Assembler.PoolTableEntry entry : assembler.poolTable) {
             System.out.println(entry.index + " " + entry.length);

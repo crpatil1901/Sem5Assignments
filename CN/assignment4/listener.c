@@ -7,7 +7,6 @@
 #define WINDOW_SIZE 4
 #define PACKET_SIZE 1024
 
-// Packet structure
 struct Packet {
     int seq_number;
     char data[PACKET_SIZE];
@@ -19,40 +18,33 @@ int main() {
     socklen_t addr_len = sizeof(client_addr);
     int expected_seq_num = 0;
 
-    // Create a UDP socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Socket creation failed");
         exit(1);
     }
 
-    // Initialize server address and port
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(8080);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // Bind the socket to the server address
     if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Binding failed");
         exit(1);
     }
 
-    // Receiver logic (Go-Back-N)
     while (1) {
         struct Packet packet;
         int packet_received = recvfrom(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, &addr_len);
 
         if (packet_received != -1 && packet.seq_number == expected_seq_num) {
-            // Process the received packet and deliver data to the application layer
             printf("Received packet with sequence number: %d\n", packet.seq_number);
             
-            // Send acknowledgment for the received packet
             sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&client_addr, addr_len);
 
             expected_seq_num++;
         } else {
-            // Packet out of order or error, discard and request retransmission
             printf("Packet out of order or error. Expected: %d, Received: %d\n", expected_seq_num, packet.seq_number);
         }
     }
