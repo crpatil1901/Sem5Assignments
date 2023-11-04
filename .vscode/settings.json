@@ -1,3 +1,7 @@
 {
-    "python.analysis.typeCheckingMode": "off"
+    "python.analysis.typeCheckingMode": "off",
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar",
+        "/Users/chinmay/Downloads/mongo-java-driver-3.12.14.jar"
+    ]
 }

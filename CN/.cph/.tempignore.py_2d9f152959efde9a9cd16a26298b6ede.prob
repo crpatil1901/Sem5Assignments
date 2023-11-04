@@ -1,0 +1,1 @@
+{"name":"Local: tempignore","url":"/Users/chinmay/Documents/Sem5Assignments/CN/tempignore.py","tests":[{"id":1698853896266,"input":"1\n5\n6 5 3 4 4","output":""}],"interactive":false,"memoryLimit":1024,"timeLimit":3000,"srcPath":"/Users/chinmay/Documents/Sem5Assignments/CN/tempignore.py","group":"local","local":true}
