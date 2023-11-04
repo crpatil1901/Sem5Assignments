@@ -57,7 +57,17 @@ def calculate_subnet_details(ip_address, cidr):
 
 if __name__ == "__main__":
     ip_address = "172.20.10.4"
-    cidr = 28
+    cidr = 0
+    if findClass(ip_address) == "A":
+        cidr = 8
+    elif findClass(ip_address) == "B":
+        cidr = 16
+    elif findClass(ip_address) == "C":
+        cidr = 24
+    elif findClass(ip_address) == "D":
+        cidr = 28
+    elif findClass(ip_address) == "E":
+        cidr = 32
     subnet_details = calculate_subnet_details(ip_address, cidr)
     for key, value in subnet_details.items():
         print(f"{key}: {value}")                            
